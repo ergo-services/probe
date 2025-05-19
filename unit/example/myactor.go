@@ -26,6 +26,8 @@ func (a *myActor) HandleMessage(from gen.PID, message any) error {
 	switch message {
 	case "increase":
 		a.value += 8
+		a.Log().Info("increased value by %d", 8)
+		a.Send(gen.Atom("abc"), a.value)
 		return nil
 	}
 	return gen.TerminateReasonNormal

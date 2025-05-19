@@ -15,7 +15,7 @@ func TestMyActor_Init(t *testing.T) {
 
 	expected := []any{
 		unit.ArtifactSend{From: process.PID(), To: process.PID(), Message: "hello"},
-		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
+		unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
 	}
 	process.ValidateArtifacts(t, expected)
 
@@ -30,12 +30,17 @@ func TestMyActor_Init(t *testing.T) {
 
 	t.Logf("started process: %s", process.PID())
 
+	process.Log().SetLevel(gen.LogLevelWarning)
 	behavior.value = 8
 	behavior.HandleMessage(gen.PID{}, "increase")
 	if behavior.value != 16 {
 		t.Fatalf("hasn't been increased")
 	}
 
-	process.ValidateArtifacts(t, nil)
+	expected = []any{
+		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
+		unit.ArtifactSend{From: process.PID(), To: gen.Atom("abc"), Message: behavior.value},
+	}
+	process.ValidateArtifacts(t, expected)
 
 }

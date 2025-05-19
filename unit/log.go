@@ -42,7 +42,7 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Info", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level < gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelInfo {
 				return
 			}
 			format := args.Get(0).(string)
@@ -58,7 +58,7 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Debug", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level < gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelInfo {
 				return
 			}
 			format := args.Get(0).(string)
@@ -74,7 +74,7 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Warning", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level < gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelInfo {
 				return
 			}
 			format := args.Get(0).(string)
@@ -90,7 +90,7 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Error", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level < gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelInfo {
 				return
 			}
 			format := args.Get(0).(string)
@@ -106,7 +106,7 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Panic", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level < gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelInfo {
 				return
 			}
 			format := args.Get(0).(string)

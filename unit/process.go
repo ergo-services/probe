@@ -17,8 +17,12 @@ type Process struct {
 }
 
 func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
+	if len(expected) == 0 {
+		t.Fatal("no artifacts specified")
+	}
+
 	if len(expected) != int(p.artifacts.Len()) {
-		t.Fatal("number of artifacts mismatch with the expecting ones")
+		t.Fatalf("number of artifacts (%d) mismatch with the expecting ones (%d)", p.artifacts.Len(), len(expected))
 	}
 
 	for {
