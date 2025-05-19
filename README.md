@@ -11,3 +11,8 @@ A simple library for validating actor behavior without spawning full system
 
 Doc: https://docs.ergo.services/testing/unit
 
+## stage
+A library for integration testing of multiple Ergo actors within a controlled runtime environment
+
+Doc: https://docs.ergo.services/testing/stage
+
