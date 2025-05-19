@@ -6,14 +6,36 @@ import (
 	"testing"
 )
 
-func TestMActor_Init(t *testing.T) {
-	node := unit.StartNode(t, "node-sub@localhost", gen.NodeOptions{})
+func TestMyActor_Init(t *testing.T) {
+	options := unit.SpawnOptions{}
+	process, err := unit.Spawn(t, factoryMyActor, options)
+	if err != nil {
+		t.Fatalf("unable to spawn: %s", err)
+	}
 
-	pid, proc := node.Spawn(factoryMyActor) // ProcessInit + Init already run
+	expected := []any{
+		unit.ArtifactSend{From: process.PID(), To: process.PID(), Message: "hello"},
+		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
+	}
+	process.ValidateArtifacts(t, expected)
 
-	node.HasProcessInit(t, pid) // ← NEW single‑call assertion
+	// check the Artifacts
+	// sent message to itself
+	// logged message with Info level
 
-	// still check logging if you like
-	node.MockLog(proc).AssertNumberOfCalls(t, "Info", 1)
-	proc.AssertExpectations(t)
+	behavior := process.Behavior().(*myActor)
+	if behavior.value != 1 {
+		t.Fatal("incorrect value")
+	}
+
+	t.Logf("started process: %s", process.PID())
+
+	behavior.value = 8
+	behavior.HandleMessage(gen.PID{}, "increase")
+	if behavior.value != 16 {
+		t.Fatalf("hasn't been increased")
+	}
+
+	process.ValidateArtifacts(t, nil)
+
 }
