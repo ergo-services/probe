@@ -6,3 +6,8 @@
 
 A test toolkit for unit and integration testing of services built with the Ergo Framework 3.0 (and above)
 
+## unit
+A simple library for validating actor behavior without spawning full system
+
+Doc: https://docs.ergo.services/testing/unit
+
