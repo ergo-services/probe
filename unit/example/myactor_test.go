@@ -10,8 +10,10 @@ import (
 func TestMyActor_Init(t *testing.T) {
 	options := unit.SpawnOptions{
 		Priority: gen.MessagePriorityNormal,
-		CallHelpers: []unit.CallHelper{
-			{Request: 12345, Response: 6789},
+		Helpers: unit.SpawnHelpers{
+			Call: []unit.CallHelper{
+				{Request: 12345, Response: 6789},
+			},
 		},
 	}
 	process, err := unit.Spawn(t, factoryMyActor, options)

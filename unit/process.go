@@ -16,15 +16,11 @@ import (
 type Process struct {
 	*stub.Process
 
-	priority    gen.MessagePriority
-	important   bool
-	node        *node
-	callHelpers []CallHelper
-
+	options   processOptions
 	artifacts lib.QueueMPSC
 }
 
-func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
+func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 	t.Helper()
 
 	if len(expected) == 0 {
@@ -35,13 +31,18 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 	for {
 		a, ok := p.artifacts.Pop()
 		if !ok {
-			break
+			t.Fatalf("ValidateArtifacts: count mismatch: got %d, want %d",
+				len(actual), len(expected))
 		}
-		actual = append(actual, a)
-	}
 
-	if got, want := len(actual), len(expected); got != want {
-		t.Fatalf("ValidateArtifacts: count mismatch: got %d, want %d", got, want)
+		left = int(p.artifacts.Len())
+
+		actual = append(actual, a)
+		if len(actual) < len(expected) {
+			continue
+		}
+
+		break
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
@@ -74,6 +75,8 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 
 		t.Fatalf("ValidateArtifacts: mismatch (-expected +actual):\n%s", b.String())
 	}
+
+	return
 }
 
 func (p *Process) ResetArtifacts() int {
@@ -88,25 +91,30 @@ func (p *Process) ResetArtifacts() int {
 }
 
 type processOptions struct {
-	name        gen.Atom
-	node        *node
-	callHelpers []CallHelper
-	priority    gen.MessagePriority
-	important   bool
+	SpawnOptions
+	node *node
 }
 
 func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *Process {
 	process := &Process{
-		Process:     stub.NewProcess(t),
-		artifacts:   artifacts,
-		node:        options.node,
-		callHelpers: options.callHelpers,
-		priority:    options.priority,
-		important:   options.important,
+		Process:   stub.NewProcess(t),
+		artifacts: artifacts,
+		options:   options,
 	}
 	nodeName := options.node.Name()
 	creation := options.node.Creation()
 	pid := gen.PID{Node: nodeName, ID: 1000, Creation: creation}
+
+	emptyPID := gen.PID{}
+	if options.Parent == emptyPID {
+		options.Parent = options.node.PID()
+	}
+	process.On("Parent").Return(options.Parent).Maybe()
+
+	if options.Leader == emptyPID {
+		options.Leader = options.node.PID()
+	}
+	process.On("Leader").Return(options.Leader).Maybe()
 
 	process.On("Node").Return(options.node).Maybe()
 
@@ -115,29 +123,44 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 
 	process.On("Log").Return(stubProcessLog).Maybe()
 	process.On("PID").Return(pid)
-	process.On("Name").Return(options.name).Maybe()
+
+	process.On("Name").Return(func() gen.Atom {
+		return process.options.Register
+	}).Maybe()
+	process.On("RegisterName", mock.AnythingOfType("gen.Atom")).
+		Return(func(name gen.Atom) error {
+			process.options.Register = name
+			return nil
+		}).Maybe()
+	process.On("UnregisterName", mock.AnythingOfType("gen.Atom")).
+		Return(func(name gen.Atom) error {
+			process.options.Register = ""
+			return nil
+		}).Maybe()
+
+	process.On("Uptime").Return(0).Maybe()
 
 	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).
 		Run(func(args mock.Arguments) {
-			process.priority = args.Get(0).(gen.MessagePriority)
+			process.options.Priority = args.Get(0).(gen.MessagePriority)
 		}).
 		Return(nil).
 		Maybe()
 	process.On("SendPriority").
 		Return(func() gen.MessagePriority {
-			return process.priority
+			return process.options.Priority
 		}).
 		Maybe()
 
 	process.On("SetImportantDelivery", mock.AnythingOfType("bool")).
 		Run(func(args mock.Arguments) {
-			process.important = args.Get(0).(bool)
+			process.options.ImportantDelivery = args.Get(0).(bool)
 		}).
 		Return(nil).
 		Maybe()
 	process.On("ImportantDelivery").
 		Return(func() bool {
-			return process.important
+			return process.options.ImportantDelivery
 		}).
 		Maybe()
 
@@ -147,8 +170,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
-			Priority:  process.priority,
-			Important: process.important,
+			Priority:  process.options.Priority,
+			Important: process.options.ImportantDelivery,
 		}
 		process.artifacts.Push(art)
 	}
@@ -160,7 +183,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			To:        args.Get(0),
 			Message:   args.Get(1),
 			Priority:  args.Get(2).(gen.MessagePriority),
-			Important: process.important,
+			Important: process.options.ImportantDelivery,
 		}
 		process.artifacts.Push(art)
 	}
@@ -171,7 +194,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
-			Priority:  process.priority,
+			Priority:  process.options.Priority,
 			Important: true,
 		}
 		process.artifacts.Push(art)
@@ -209,9 +232,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		Run(func(args mock.Arguments) {
 			art := ArtifactEvent{
 				Name:     args.Get(0).(gen.Atom),
-				Token:    args.Get(1).(gen.Ref),
 				Message:  args.Get(2),
-				Priority: process.priority,
+				Priority: process.options.Priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -247,7 +269,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 				To:       args.Get(0),
 				Ref:      args.Get(1).(gen.Ref),
 				Message:  args.Get(2),
-				Priority: process.priority,
+				Priority: process.options.Priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -261,7 +283,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 				To:       args.Get(0),
 				Ref:      args.Get(1).(gen.Ref),
 				Message:  args.Get(2).(error),
-				Priority: process.priority,
+				Priority: process.options.Priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -275,7 +297,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			Request: request,
 		}
 		process.artifacts.Push(art)
-		for _, helper := range process.callHelpers {
+		for _, helper := range process.options.Helpers.Call {
 			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
 				continue
 			}
@@ -292,7 +314,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			Request: request,
 		}
 		process.artifacts.Push(art)
-		for _, helper := range process.callHelpers {
+		for _, helper := range process.options.Helpers.Call {
 			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
 				continue
 			}
@@ -309,7 +331,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			Request: request,
 		}
 		process.artifacts.Push(art)
-		for _, helper := range process.callHelpers {
+		for _, helper := range process.options.Helpers.Call {
 			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
 				continue
 			}
@@ -428,3 +450,24 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 	return process
 }
+
+// TODO:
+// Forward(to PID, message *MailboxMessage, priority MessagePriority) error
+// MetaInfo(meta Alias) (MetaInfo, error)
+// Info() (ProcessInfo, error)
+// RegisterEvent(name Atom, options EventOptions) (Ref, error)
+// UnregisterEvent(name Atom) error
+// Inspect(target PID, item ...string) (map[string]string, error)
+// InspectMeta(meta Alias, item ...string) (map[string]string, error)
+// Events() []Atom
+// Aliases() []Alias
+// DeleteAlias(alias Alias) error
+// CreateAlias() (Alias, error)
+// Env(name Env) (any, bool)
+// SetEnv(name Env, value any)
+// EnvList() map[Env]any
+// RemoteSpawnRegister(node Atom, name Atom, register Atom, options ProcessOptions, args ...any) (PID, error)
+// RemoteSpawn(node Atom, name Atom, options ProcessOptions, args ...any) (PID, error)
+// SpawnMeta(behavior MetaBehavior, options MetaOptions) (Alias, error)
+// SpawnRegister(register Atom, factory ProcessFactory, options ProcessOptions, args ...any) (PID, error)
+// Spawn(factory ProcessFactory, options ProcessOptions, args ...any) (PID, error)

@@ -20,7 +20,6 @@ type ArtifactLog struct {
 
 type ArtifactEvent struct {
 	Name     gen.Atom
-	Token    gen.Ref
 	Message  any
 	Priority gen.MessagePriority
 }
