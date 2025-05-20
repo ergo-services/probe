@@ -187,7 +187,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 	}).Return(nil).Maybe()
 
 	process.On("SendExitMeta", mock.AnythingOfType("gen.Alias"), mock.AnythingOfType("error")).Run(func(args mock.Arguments) {
-		art := ArtifactExit{
+		art := ArtifactExitMeta{
 			Meta:   args.Get(0).(gen.Alias),
 			Reason: args.Get(1).(error),
 		}

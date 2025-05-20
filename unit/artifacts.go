@@ -26,6 +26,10 @@ type ArtifactEvent struct {
 
 type ArtifactExit struct {
 	To     gen.PID
+	Reason error
+}
+
+type ArtifactExitMeta struct {
 	Meta   gen.Alias
 	Reason error
 }
