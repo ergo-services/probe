@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -47,10 +46,11 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 
 	if !reflect.DeepEqual(expected, actual) {
 		// pretty-print to JSON
-		expJSON, _ := json.MarshalIndent(expected, "", "  ")
-		actJSON, _ := json.MarshalIndent(actual, "", "  ")
-		expLines := strings.Split(string(expJSON), "\n")
-		actLines := strings.Split(string(actJSON), "\n")
+		expJSON, _ := marshalWithoutEscaping(expected)
+		actJSON, _ := marshalWithoutEscaping(actual)
+
+		expLines := strings.Split(expJSON, "\n")
+		actLines := strings.Split(actJSON, "\n")
 
 		var b strings.Builder
 		max := len(expLines)

@@ -4,6 +4,7 @@ import (
 	"ergo.services/ergo/gen"
 	"ergo.services/ergo/lib"
 	"ergo.services/testing/unit/stub"
+	"github.com/stretchr/testify/mock"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,6 +40,26 @@ func newNode(t testing.TB, artifacts lib.QueueMPSC) *node {
 		ref.ID[1] = id >> 46
 		return ref
 	}).Maybe()
+
+	stubNode.On("Send").Run(func(args mock.Arguments) {
+		art := ArtifactSend{
+			From:     virtualPID,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: gen.MessagePriorityNormal,
+		}
+		artifacts.Push(art)
+	}).Return(nil).Maybe()
+
+	stubNode.On("SendWithPriority").Run(func(args mock.Arguments) {
+		art := ArtifactSend{
+			From:     virtualPID,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: args.Get(2).(gen.MessagePriority),
+		}
+		artifacts.Push(art)
+	}).Return(nil).Maybe()
 
 	stubNetwork := newNetwork(t, artifacts)
 	stubNode.On("Network").Return(stubNetwork).Maybe()
