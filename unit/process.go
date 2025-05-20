@@ -76,6 +76,17 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 	}
 }
 
+func (p *Process) ResetArtifacts() int {
+	l := p.artifacts.Len()
+	for {
+		_, ok := p.artifacts.Pop()
+		if !ok {
+			break
+		}
+	}
+	return int(l)
+}
+
 type processOptions struct {
 	name        gen.Atom
 	node        *node
