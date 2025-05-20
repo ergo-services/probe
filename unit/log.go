@@ -6,8 +6,9 @@ import (
 
 	"ergo.services/ergo/gen"
 	"ergo.services/ergo/lib"
-	"ergo.services/probe/unit/stub"
 	"github.com/stretchr/testify/mock"
+
+	"ergo.services/probe/unit/stub"
 )
 
 type log struct {
