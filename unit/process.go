@@ -17,8 +17,8 @@ import (
 type Process struct {
 	*stub.Process
 
-	Priority  gen.MessagePriority
-	Important bool
+	priority    gen.MessagePriority
+	important   bool
 	node        *node
 	callHelpers []CallHelper
 
@@ -80,6 +80,8 @@ type processOptions struct {
 	name        gen.Atom
 	node        *node
 	callHelpers []CallHelper
+	priority    gen.MessagePriority
+	important   bool
 }
 
 func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *Process {
@@ -88,6 +90,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		artifacts:   artifacts,
 		node:        options.node,
 		callHelpers: options.callHelpers,
+		priority:    options.priority,
+		important:   options.important,
 	}
 	nodeName := options.node.Name()
 	creation := options.node.Creation()
@@ -104,25 +108,25 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 
 	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).
 		Run(func(args mock.Arguments) {
-			process.Priority = args.Get(0).(gen.MessagePriority)
+			process.priority = args.Get(0).(gen.MessagePriority)
 		}).
 		Return(nil).
 		Maybe()
 	process.On("SendPriority").
 		Return(func() gen.MessagePriority {
-			return process.Priority
+			return process.priority
 		}).
 		Maybe()
 
 	process.On("SetImportantDelivery", mock.AnythingOfType("bool")).
 		Run(func(args mock.Arguments) {
-			process.Important = args.Get(0).(bool)
+			process.important = args.Get(0).(bool)
 		}).
 		Return(nil).
 		Maybe()
 	process.On("ImportantDelivery").
 		Return(func() bool {
-			return process.Important
+			return process.important
 		}).
 		Maybe()
 
@@ -132,8 +136,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
-			Priority:  process.Priority,
-			Important: process.Important,
+			Priority:  process.priority,
+			Important: process.important,
 		}
 		process.artifacts.Push(art)
 	}
@@ -145,7 +149,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			To:        args.Get(0),
 			Message:   args.Get(1),
 			Priority:  args.Get(2).(gen.MessagePriority),
-			Important: process.Important,
+			Important: process.important,
 		}
 		process.artifacts.Push(art)
 	}
@@ -156,7 +160,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
-			Priority:  process.Priority,
+			Priority:  process.priority,
 			Important: true,
 		}
 		process.artifacts.Push(art)
@@ -196,7 +200,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 				Name:     args.Get(0).(gen.Atom),
 				Token:    args.Get(1).(gen.Ref),
 				Message:  args.Get(2),
-				Priority: process.Priority,
+				Priority: process.priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -232,7 +236,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 				To:       args.Get(0),
 				Ref:      args.Get(1).(gen.Ref),
 				Message:  args.Get(2),
-				Priority: process.Priority,
+				Priority: process.priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -246,7 +250,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 				To:       args.Get(0),
 				Ref:      args.Get(1).(gen.Ref),
 				Message:  args.Get(2).(error),
-				Priority: process.Priority,
+				Priority: process.priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -286,7 +290,6 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 
 		return nil, nil
 	}).Maybe()
-	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 
 	closureCallTimeout := func(to any, request any, _ int) (any, error) {
 		art := ArtifactCall{

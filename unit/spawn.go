@@ -12,10 +12,10 @@ type CallHelper struct {
 	Response any
 }
 type SpawnOptions struct {
-	LogLevel    gen.LogLevel
-	CallHelpers []CallHelper
+	LogLevel          gen.LogLevel
 	Priority          gen.MessagePriority
 	ImportantDelivery bool
+	CallHelpers       []CallHelper
 }
 
 func Spawn(t testing.TB, factory gen.ProcessFactory, options SpawnOptions, args ...any) (*Process, error) {
@@ -34,10 +34,10 @@ func SpawnRegister(t testing.TB, name gen.Atom, factory gen.ProcessFactory, opti
 		name:        name,
 		node:        stubNode,
 		callHelpers: options.CallHelpers,
+		priority:    options.Priority,
+		important:   options.ImportantDelivery,
 	}
 	stubProcess := newProcess(t, artifacts, popts)
-	_ = stubProcess.SetSendPriority(options.Priority)
-	_ = stubProcess.SetImportantDelivery(options.ImportantDelivery)
 	stubProcess.On("Behavior").Return(behavior).Maybe()
 	err := behavior.ProcessInit(stubProcess, args...)
 	return stubProcess, err

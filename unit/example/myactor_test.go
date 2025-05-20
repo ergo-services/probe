@@ -42,7 +42,7 @@ func TestMyActor_Init(t *testing.T) {
 	expected = []any{
 		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
 		unit.ArtifactSend{From: process.PID(), To: gen.Atom("abc"), Message: behavior.value},
-		unit.ArtifactCall{From: process.PID(), To: gen.ProcessID{}, Request: 12345},
+		unit.ArtifactCall{From: process.PID(), To: gen.PID{}, Request: 12345},
 	}
 	process.ValidateArtifacts(t, expected)
 
