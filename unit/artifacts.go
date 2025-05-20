@@ -14,3 +14,10 @@ type ArtifactLog struct {
 	Level   gen.LogLevel
 	Message string
 }
+
+type ArtifactCall struct {
+	From     gen.PID
+	To       any
+	Request  any
+	Priority gen.MessagePriority
+}

@@ -13,7 +13,9 @@ import (
 type Process struct {
 	*stub.Process
 
-	artifacts lib.QueueMPSC
+	node        *node
+	callHelpers []CallHelper
+	artifacts   lib.QueueMPSC
 }
 
 func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
@@ -38,23 +40,31 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 	}
 }
 
-func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node) *Process {
+type processOptions struct {
+	name        gen.Atom
+	node        *node
+	callHelpers []CallHelper
+}
+
+func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *Process {
 	process := &Process{
-		Process:   stub.NewProcess(t),
-		artifacts: artifacts,
+		Process:     stub.NewProcess(t),
+		artifacts:   artifacts,
+		node:        options.node,
+		callHelpers: options.callHelpers,
 	}
-	nodeName := node.Name()
-	creation := node.Creation()
+	nodeName := options.node.Name()
+	creation := options.node.Creation()
 	pid := gen.PID{Node: nodeName, ID: 1000, Creation: creation}
 
-	process.On("Node").Return(node).Maybe()
+	process.On("Node").Return(options.node).Maybe()
 
 	stubProcessLog := newStubLog(t, artifacts)
-	stubProcessLog.SetLevel(node.Log().Level())
+	stubProcessLog.SetLevel(options.node.Log().Level())
 
 	process.On("Log").Return(stubProcessLog).Maybe()
 	process.On("PID").Return(pid)
-	process.On("Name").Return(name).Maybe()
+	process.On("Name").Return(options.name).Maybe()
 	process.On("Send", mock.AnythingOfType("gen.PID"), mock.Anything).Run(func(args mock.Arguments) {
 		art := ArtifactSend{
 			From:    pid,
@@ -88,7 +98,84 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 		process.artifacts.Push(art)
 	}).Return(nil).Maybe()
 
+	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).Return(func(to any, request any) (any, error) {
+		art := ArtifactCall{
+			From:    pid,
+			To:      to,
+			Request: request,
+		}
+		process.artifacts.Push(art)
+		for _, helper := range process.callHelpers {
+			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+				continue
+			}
+			return helper.Response, nil
+		}
+
+		return nil, nil
+	}).Maybe()
+
+	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Return(func(to any, request any) (any, error) {
+		art := ArtifactCall{
+			From:    pid,
+			To:      to,
+			Request: request,
+		}
+		process.artifacts.Push(art)
+		for _, helper := range process.callHelpers {
+			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+				continue
+			}
+			return helper.Response, nil
+		}
+
+		return nil, nil
+	}).Maybe()
 	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 
+	closureCallTimeout := func(to any, request any, _ int) (any, error) {
+		art := ArtifactCall{
+			From:    pid,
+			To:      to,
+			Request: request,
+		}
+		process.artifacts.Push(art)
+		for _, helper := range process.callHelpers {
+			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+				continue
+			}
+			return helper.Response, nil
+		}
+
+		return nil, nil
+	}
+	closureCall := func(to any, request any) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+	closureCallPID := func(to gen.PID, request any, timeout int) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+	closureCallProcessID := func(to gen.ProcessID, request any, timeout int) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+	closureCallAlias := func(to gen.Alias, request any, timeout int) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+
+	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.Alias"), mock.Anything).Return(closureCall).Maybe()
+	process.
+		On("CallPID", mock.AnythingOfType("gen.PID"), mock.Anything, mock.AnythingOfType("int")).
+		Return(closureCallPID).Maybe()
+	process.
+		On("CallProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything, mock.AnythingOfType("int")).
+		Return(closureCallProcessID).Maybe()
+	process.
+		On("CallAlias", mock.AnythingOfType("gen.Alias"), mock.Anything, mock.AnythingOfType("int")).
+		Return(closureCallAlias).Maybe()
+
+	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 	return process
 }

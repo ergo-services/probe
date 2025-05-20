@@ -7,8 +7,13 @@ import (
 	"ergo.services/ergo/lib"
 )
 
+type CallHelper struct {
+	Request  any
+	Response any
+}
 type SpawnOptions struct {
-	LogLevel gen.LogLevel
+	LogLevel    gen.LogLevel
+	CallHelpers []CallHelper
 }
 
 func Spawn(t testing.TB, factory gen.ProcessFactory, options SpawnOptions, args ...any) (*Process, error) {
@@ -23,7 +28,12 @@ func SpawnRegister(t testing.TB, name gen.Atom, factory gen.ProcessFactory, opti
 
 	stubNode.Log().SetLevel(options.LogLevel)
 
-	stubProcess := newProcess(t, artifacts, name, stubNode)
+	popts := processOptions{
+		name:        name,
+		node:        stubNode,
+		callHelpers: options.CallHelpers,
+	}
+	stubProcess := newProcess(t, artifacts, popts)
 	stubProcess.On("Behavior").Return(behavior).Maybe()
 	err := behavior.ProcessInit(stubProcess, args...)
 	return stubProcess, err

@@ -3,6 +3,7 @@ package main
 import (
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"fmt"
 )
 
 func factoryMyActor() gen.ProcessBehavior {
@@ -28,6 +29,9 @@ func (a *myActor) HandleMessage(from gen.PID, message any) error {
 		a.value += 8
 		a.Log().Info("increased value by %d", 8)
 		a.Send(gen.Atom("abc"), a.value)
+
+		ret, err := a.CallPID(gen.PID{}, 12345, 1)
+		fmt.Println("AAAAA: ", ret, err)
 		return nil
 	}
 	return gen.TerminateReasonNormal

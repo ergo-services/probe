@@ -7,7 +7,11 @@ import (
 )
 
 func TestMyActor_Init(t *testing.T) {
-	options := unit.SpawnOptions{}
+	options := unit.SpawnOptions{
+		CallHelpers: []unit.CallHelper{
+			{Request: 12345, Response: 6789},
+		},
+	}
 	process, err := unit.Spawn(t, factoryMyActor, options)
 	if err != nil {
 		t.Fatalf("unable to spawn: %s", err)
@@ -36,6 +40,7 @@ func TestMyActor_Init(t *testing.T) {
 	expected = []any{
 		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
 		unit.ArtifactSend{From: process.PID(), To: gen.Atom("abc"), Message: behavior.value},
+		unit.ArtifactCall{From: process.PID(), To: gen.ProcessID{}, Request: 12345},
 	}
 	process.ValidateArtifacts(t, expected)
 
