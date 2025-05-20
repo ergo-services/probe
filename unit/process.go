@@ -73,7 +73,6 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 		t.Fatalf("ValidateArtifacts: mismatch (-expected +actual):\n%s", b.String())
 	}
 }
-
 func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node) *Process {
 	process := &Process{
 		Process:   stub.NewProcess(t),
@@ -87,27 +86,36 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 
 	stubProcessLog := newStubLog(t, artifacts)
 	stubProcessLog.SetLevel(node.Log().Level())
-
 	process.On("Log").Return(stubProcessLog).Maybe()
 	process.On("PID").Return(pid)
 	process.On("Name").Return(name).Maybe()
 
-	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).Run(func(args mock.Arguments) {
-		process.Priority = args.Get(0).(gen.MessagePriority)
-	}).Return(nil).Maybe()
-	process.On("SendPriority").Return(func() gen.MessagePriority {
-		return process.Priority
-	}).Maybe()
+	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).
+		Run(func(args mock.Arguments) {
+			process.Priority = args.Get(0).(gen.MessagePriority)
+		}).
+		Return(nil).
+		Maybe()
+	process.On("SendPriority").
+		Return(func() gen.MessagePriority {
+			return process.Priority
+		}).
+		Maybe()
 
-	process.On("SetImportantDelivery", mock.AnythingOfType("bool")).Run(func(args mock.Arguments) {
-		process.Important = args.Get(0).(bool)
-	}).Return(nil).Maybe()
+	process.On("SetImportantDelivery", mock.AnythingOfType("bool")).
+		Run(func(args mock.Arguments) {
+			process.Important = args.Get(0).(bool)
+		}).
+		Return(nil).
+		Maybe()
+	process.On("ImportantDelivery").
+		Return(func() bool {
+			return process.Important
+		}).
+		Maybe()
 
-	process.On("ImportantDelivery").Return(func() bool {
-		return process.Important
-	}).Maybe()
-
-	process.On("Send", mock.AnythingOfType("gen.PID"), mock.Anything).Run(func(args mock.Arguments) {
+	// 1) the generic two-arg Send(dest, msg)
+	closureSend := func(args mock.Arguments) {
 		art := ArtifactSend{
 			From:      pid,
 			To:        args.Get(0),
@@ -116,39 +124,10 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 			Important: process.Important,
 		}
 		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
-	process.On("Send", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Run(func(args mock.Arguments) {
-		art := ArtifactSend{
-			From:      pid,
-			To:        args.Get(0),
-			Message:   args.Get(1),
-			Priority:  process.Priority,
-			Important: process.Important,
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
-	process.On("Send", mock.AnythingOfType("gen.Atom"), mock.Anything).Run(func(args mock.Arguments) {
-		art := ArtifactSend{
-			From:      pid,
-			To:        args.Get(0),
-			Message:   args.Get(1),
-			Priority:  process.Priority,
-			Important: process.Important,
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
-	process.On("Send", mock.AnythingOfType("gen.Alias"), mock.Anything).Run(func(args mock.Arguments) {
-		art := ArtifactSend{
-			From:      pid,
-			To:        args.Get(0),
-			Message:   args.Get(1),
-			Priority:  process.Priority,
-			Important: process.Important,
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	}
 
-	process.On("SendWithPriority", mock.Anything, mock.Anything, mock.AnythingOfType("gen.MessagePriority")).Run(func(args mock.Arguments) {
+	// 2) SendWithPriority(dest, msg, priority)
+	closureSendWithPriority := func(args mock.Arguments) {
 		art := ArtifactSend{
 			From:      pid,
 			To:        args.Get(0),
@@ -157,78 +136,110 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 			Important: process.Important,
 		}
 		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	}
 
-	process.On("SendImportant", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	// 3) SendImportant(dest, msg)
+	closureSendImportant := func(args mock.Arguments) {
 		art := ArtifactSend{
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
+			Priority:  process.Priority,
 			Important: true,
-			Priority:  process.Priority,
 		}
 		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	}
 
+	process.On("Send", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureSend).Return(nil).Maybe()
+	process.On("Send", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureSend).Return(nil).Maybe()
+	process.On("Send", mock.AnythingOfType("gen.Atom"), mock.Anything).
+		Run(closureSend).Return(nil).Maybe()
+	process.On("Send", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureSend).Return(nil).Maybe()
+
+	// SendWithPriority
+	process.On("SendWithPriority", mock.Anything, mock.Anything, mock.AnythingOfType("gen.MessagePriority")).
+		Run(closureSendWithPriority).
+		Return(nil).
+		Maybe()
+
+	// SendImportant
+	process.On("SendImportant", mock.Anything, mock.Anything).
+		Run(closureSendImportant).
+		Return(nil).
+		Maybe()
+
+	// SendAfter
 	// Todo do we want to check gen.CancelFunc?
-	process.On("SendAfter", mock.Anything, mock.Anything, mock.AnythingOfType("time.Duration")).Run(func(args mock.Arguments) {
-		art := ArtifactSend{
-			From:      pid,
-			To:        args.Get(0),
-			Message:   args.Get(1),
-			Priority:  process.Priority,
-			Important: process.Important,
-		}
-		process.artifacts.Push(art)
-	}).Return(gen.CancelFunc(nil), nil).Maybe()
+	process.On("SendAfter", mock.Anything, mock.Anything, mock.AnythingOfType("time.Duration")).
+		Run(closureSend).
+		Return(gen.CancelFunc(nil), nil).
+		Maybe()
 
-	process.On("SendEvent", mock.AnythingOfType("gen.Atom"), mock.AnythingOfType("gen.Ref"), mock.Anything).Run(func(args mock.Arguments) {
-		art := ArtifactEvent{
-			Name:     args.Get(0).(gen.Atom),
-			Token:    args.Get(1).(gen.Ref),
-			Message:  args.Get(2),
-			Priority: process.Priority,
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	process.On("SendEvent", mock.AnythingOfType("gen.Atom"), mock.AnythingOfType("gen.Ref"), mock.Anything).
+		Run(func(args mock.Arguments) {
+			art := ArtifactEvent{
+				Name:     args.Get(0).(gen.Atom),
+				Token:    args.Get(1).(gen.Ref),
+				Message:  args.Get(2),
+				Priority: process.Priority,
+			}
+			process.artifacts.Push(art)
+		}).
+		Return(nil).
+		Maybe()
 
-	process.On("SendExit", mock.AnythingOfType("gen.PID"), mock.AnythingOfType("error")).Run(func(args mock.Arguments) {
-		art := ArtifactExit{
-			To:     args.Get(0).(gen.PID),
-			Reason: args.Get(1).(error),
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	process.On("SendExit", mock.AnythingOfType("gen.PID"), mock.AnythingOfType("error")).
+		Run(func(args mock.Arguments) {
+			art := ArtifactExit{
+				To:     args.Get(0).(gen.PID),
+				Reason: args.Get(1).(error),
+			}
+			process.artifacts.Push(art)
+		}).
+		Return(nil).
+		Maybe()
 
-	process.On("SendExitMeta", mock.AnythingOfType("gen.Alias"), mock.AnythingOfType("error")).Run(func(args mock.Arguments) {
-		art := ArtifactExitMeta{
-			Meta:   args.Get(0).(gen.Alias),
-			Reason: args.Get(1).(error),
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	process.On("SendExitMeta", mock.AnythingOfType("gen.Alias"), mock.AnythingOfType("error")).
+		Run(func(args mock.Arguments) {
+			art := ArtifactExitMeta{
+				Meta:   args.Get(0).(gen.Alias),
+				Reason: args.Get(1).(error),
+			}
+			process.artifacts.Push(art)
+		}).
+		Return(nil).
+		Maybe()
 
-	process.On("SendResponse", mock.AnythingOfType("gen.PID"), mock.AnythingOfType("gen.Ref"), mock.Anything).Run(func(args mock.Arguments) {
-		art := ArtifactSend{
-			From:     pid,
-			To:       args.Get(0),
-			Ref:      args.Get(1).(gen.Ref),
-			Message:  args.Get(2),
-			Priority: process.Priority,
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	process.On("SendResponse", mock.AnythingOfType("gen.PID"), mock.AnythingOfType("gen.Ref"), mock.Anything).
+		Run(func(args mock.Arguments) {
+			art := ArtifactSend{
+				From:     pid,
+				To:       args.Get(0),
+				Ref:      args.Get(1).(gen.Ref),
+				Message:  args.Get(2),
+				Priority: process.Priority,
+			}
+			process.artifacts.Push(art)
+		}).
+		Return(nil).
+		Maybe()
 
-	process.On("SendResponseError", mock.AnythingOfType("gen.PID"), mock.AnythingOfType("gen.Ref"), mock.AnythingOfType("error")).Run(func(args mock.Arguments) {
-		art := ArtifactSend{
-			From:     pid,
-			To:       args.Get(0),
-			Ref:      args.Get(1).(gen.Ref),
-			Message:  args.Get(2).(error),
-			Priority: process.Priority,
-		}
-		process.artifacts.Push(art)
-	}).Return(nil).Maybe()
+	process.On("SendResponseError", mock.AnythingOfType("gen.PID"), mock.AnythingOfType("gen.Ref"), mock.AnythingOfType("error")).
+		Run(func(args mock.Arguments) {
+			art := ArtifactSend{
+				From:     pid,
+				To:       args.Get(0),
+				Ref:      args.Get(1).(gen.Ref),
+				Message:  args.Get(2).(error),
+				Priority: process.Priority,
+			}
+			process.artifacts.Push(art)
+		}).
+		Return(nil).
+		Maybe()
 
 	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 
