@@ -1,3 +1,3 @@
-module ergo.services/probe
+module ergo.services/testing
 
 go 1.20

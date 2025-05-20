@@ -11,7 +11,7 @@ import (
 	"ergo.services/ergo/lib"
 	"github.com/stretchr/testify/mock"
 
-	"ergo.services/probe/unit/stub"
+	"ergo.services/testing/unit/stub"
 )
 
 type Process struct {

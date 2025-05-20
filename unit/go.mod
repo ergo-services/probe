@@ -1,4 +1,4 @@
-module ergo.services/probe/unit
+module ergo.services/testing/unit
 
 go 1.20
 
