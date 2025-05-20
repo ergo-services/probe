@@ -19,10 +19,6 @@ func TestMyActor_Init(t *testing.T) {
 	}
 	process.ValidateArtifacts(t, expected)
 
-	// check the Artifacts
-	// sent message to itself
-	// logged message with Info level
-
 	behavior := process.Behavior().(*myActor)
 	if behavior.value != 1 {
 		t.Fatal("incorrect value")
