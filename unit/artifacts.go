@@ -41,3 +41,11 @@ type ArtifactCall struct {
 	Request  any
 	Priority gen.MessagePriority
 }
+
+type ArtifactMonitor struct {
+	Target any
+}
+
+type ArtifactDemonitor struct {
+	Target any
+}

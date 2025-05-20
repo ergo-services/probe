@@ -334,7 +334,86 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		On("CallAlias", mock.AnythingOfType("gen.Alias"), mock.Anything, mock.AnythingOfType("int")).
 		Return(closureCallAlias).Maybe()
 
-	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
+	// monitor
 
+	closureMonitor := func(target any) error {
+		art := ArtifactMonitor{
+			Target: target,
+		}
+		process.artifacts.Push(art)
+		return nil
+	}
+
+	process.On("Monitor", mock.AnythingOfType("gen.PID")).Return(closureMonitor).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.ProcessID")).Return(closureMonitor).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.Alias")).Return(closureMonitor).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.Event")).Return(closureMonitor).Maybe()
+
+	process.On("MonitorNode", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureMonitor).Maybe()
+
+	closureMonitorPID := func(target gen.PID) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorPID", mock.AnythingOfType("gen.PID")).
+		Return(closureMonitorPID).Maybe()
+
+	closureMonitorProcessID := func(target gen.ProcessID) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorProcessID", mock.AnythingOfType("gen.ProcessID")).
+		Return(closureMonitorProcessID).Maybe()
+
+	closureMonitorAlias := func(target gen.Alias) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorAlias", mock.AnythingOfType("gen.Alias")).
+		Return(closureMonitorAlias).Maybe()
+
+	closureMonitorEvent := func(target gen.Event) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorEvent", mock.AnythingOfType("gen.Event")).
+		Return(closureMonitorEvent).Maybe()
+
+	// demonitor
+
+	closureDemonitor := func(target any) error {
+		art := ArtifactDemonitor{
+			Target: target,
+		}
+		process.artifacts.Push(art)
+		return nil
+	}
+	process.On("Demonitor", mock.AnythingOfType("gen.PID")).Return(closureDemonitor).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.ProcessID")).Return(closureDemonitor).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.Alias")).Return(closureDemonitor).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.Event")).Return(closureDemonitor).Maybe()
+	process.On("DemonitorNode", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureDemonitor).Maybe()
+
+	closureDemonitorPID := func(target gen.PID) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorPID", mock.AnythingOfType("gen.PID")).
+		Return(closureDemonitorPID).Maybe()
+
+	closureDemonitorProcessID := func(target gen.ProcessID) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorProcessID", mock.AnythingOfType("gen.ProcessID")).
+		Return(closureDemonitorProcessID).Maybe()
+
+	closureDemonitorAlias := func(target gen.Alias) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorAlias", mock.AnythingOfType("gen.Alias")).
+		Return(closureDemonitorAlias).Maybe()
+
+	closureDemonitorEvent := func(target gen.Event) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorEvent", mock.AnythingOfType("gen.Event")).
+		Return(closureDemonitorEvent).Maybe()
+
+	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 	return process
 }
