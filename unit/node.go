@@ -43,22 +43,20 @@ func newNode(t testing.TB, artifacts lib.QueueMPSC) *node {
 
 	stubNode.On("Send").Run(func(args mock.Arguments) {
 		art := ArtifactSend{
-			From:      virtualPID,
-			To:        args.Get(0),
-			Message:   args.Get(1),
-			Priority:  gen.MessagePriorityNormal,
-			Important: false,
+			From:     virtualPID,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: gen.MessagePriorityNormal,
 		}
 		artifacts.Push(art)
 	}).Return(nil).Maybe()
 
 	stubNode.On("SendWithPriority").Run(func(args mock.Arguments) {
 		art := ArtifactSend{
-			From:      virtualPID,
-			To:        args.Get(0),
-			Message:   args.Get(1),
-			Priority:  args.Get(2).(gen.MessagePriority),
-			Important: false,
+			From:     virtualPID,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: args.Get(2).(gen.MessagePriority),
 		}
 		artifacts.Push(art)
 	}).Return(nil).Maybe()
