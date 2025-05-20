@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"ergo.services/ergo/gen"
-
-	"ergo.services/probe/unit"
+	"ergo.services/testing/unit"
+	"testing"
 )
 
 func TestMyActor_Init(t *testing.T) {
@@ -22,10 +22,6 @@ func TestMyActor_Init(t *testing.T) {
 		unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
 	}
 	process.ValidateArtifacts(t, expected)
-
-	// check the Artifacts
-	// sent message to itself
-	// logged message with Info level
 
 	behavior := process.Behavior().(*myActor)
 	if behavior.value != 1 {
