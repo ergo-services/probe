@@ -94,11 +94,17 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 
 	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).Run(func(args mock.Arguments) {
 		process.Priority = args.Get(0).(gen.MessagePriority)
-		fmt.Printf("SetSendPriority: %s\n", process.Priority)
-	}).
-		Return(nil)
+	}).Return(nil).Maybe()
 	process.On("SendPriority").Return(func() gen.MessagePriority {
 		return process.Priority
+	}).Maybe()
+
+	process.On("SetImportantDelivery", mock.AnythingOfType("bool")).Run(func(args mock.Arguments) {
+		process.Important = args.Get(0).(bool)
+	}).Return(nil).Maybe()
+
+	process.On("ImportantDelivery").Return(func() bool {
+		return process.Important
 	}).Maybe()
 
 	process.On("Send", mock.AnythingOfType("gen.PID"), mock.Anything).Run(func(args mock.Arguments) {
