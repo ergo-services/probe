@@ -17,6 +17,9 @@ import (
 type Process struct {
 	*stub.Process
 
+	Priority  gen.MessagePriority
+	Important bool
+
 	artifacts lib.QueueMPSC
 }
 
@@ -88,35 +91,49 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 	process.On("Log").Return(stubProcessLog).Maybe()
 	process.On("PID").Return(pid)
 	process.On("Name").Return(name).Maybe()
+
+	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).Run(func(args mock.Arguments) {
+		process.Priority = args.Get(0).(gen.MessagePriority)
+		fmt.Printf("SetSendPriority: %s\n", process.Priority)
+	}).
+		Return(nil)
+	process.On("SendPriority").Return(func() gen.MessagePriority {
+		return process.Priority
+	}).Maybe()
+
 	process.On("Send", mock.AnythingOfType("gen.PID"), mock.Anything).Run(func(args mock.Arguments) {
 		art := ArtifactSend{
-			From:    pid,
-			To:      args.Get(0),
-			Message: args.Get(1),
+			From:     pid,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: process.Priority,
 		}
 		process.artifacts.Push(art)
 	}).Return(nil).Maybe()
 	process.On("Send", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Run(func(args mock.Arguments) {
 		art := ArtifactSend{
-			From:    pid,
-			To:      args.Get(0),
-			Message: args.Get(1),
+			From:     pid,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: process.Priority,
 		}
 		process.artifacts.Push(art)
 	}).Return(nil).Maybe()
 	process.On("Send", mock.AnythingOfType("gen.Atom"), mock.Anything).Run(func(args mock.Arguments) {
 		art := ArtifactSend{
-			From:    pid,
-			To:      args.Get(0),
-			Message: args.Get(1),
+			From:     pid,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: process.Priority,
 		}
 		process.artifacts.Push(art)
 	}).Return(nil).Maybe()
 	process.On("Send", mock.AnythingOfType("gen.Alias"), mock.Anything).Run(func(args mock.Arguments) {
 		art := ArtifactSend{
-			From:    pid,
-			To:      args.Get(0),
-			Message: args.Get(1),
+			From:     pid,
+			To:       args.Get(0),
+			Message:  args.Get(1),
+			Priority: process.Priority,
 		}
 		process.artifacts.Push(art)
 	}).Return(nil).Maybe()
@@ -137,6 +154,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 			To:        args.Get(0),
 			Message:   args.Get(1),
 			Important: true,
+			Priority:  process.Priority,
 		}
 		process.artifacts.Push(art)
 	}).Return(nil).Maybe()
