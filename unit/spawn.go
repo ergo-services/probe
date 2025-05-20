@@ -39,6 +39,8 @@ func SpawnRegister(t testing.TB, name gen.Atom, factory gen.ProcessFactory, opti
 	}
 	stubProcess := newProcess(t, artifacts, popts)
 	stubProcess.On("Behavior").Return(behavior).Maybe()
-	err := behavior.ProcessInit(stubProcess, args...)
-	return stubProcess, err
+	if err := behavior.ProcessInit(stubProcess, args...); err != nil {
+		return nil, err
+	}
+	return stubProcess, nil
 }
