@@ -369,8 +369,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 	process.On("MonitorAlias", mock.AnythingOfType("gen.Alias")).
 		Return(closureMonitorAlias).Maybe()
 
-	closureMonitorEvent := func(target gen.Event) error {
-		return closureMonitor(target)
+	closureMonitorEvent := func(target gen.Event) ([]gen.MessageEvent, error) {
+		return nil, closureMonitor(target)
 	}
 	process.On("MonitorEvent", mock.AnythingOfType("gen.Event")).
 		Return(closureMonitorEvent).Maybe()
