@@ -1,13 +1,15 @@
 package main
 
 import (
+	"testing"
+
 	"ergo.services/ergo/gen"
 	"ergo.services/testing/unit"
-	"testing"
 )
 
 func TestMyActor_Init(t *testing.T) {
 	options := unit.SpawnOptions{
+		Priority: gen.MessagePriorityNormal,
 		CallHelpers: []unit.CallHelper{
 			{Request: 12345, Response: 6789},
 		},
