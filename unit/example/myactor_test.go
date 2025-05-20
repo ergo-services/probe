@@ -1,13 +1,17 @@
 package main
 
 import (
+	"testing"
+
 	"ergo.services/ergo/gen"
 	"ergo.services/testing/unit"
 	"testing"
 )
 
 func TestMyActor_Init(t *testing.T) {
-	options := unit.SpawnOptions{}
+	options := unit.SpawnOptions{
+		Priority: gen.MessagePriorityNormal,
+	}
 	process, err := unit.Spawn(t, factoryMyActor, options)
 	if err != nil {
 		t.Fatalf("unable to spawn: %s", err)
