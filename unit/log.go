@@ -6,7 +6,7 @@ import (
 
 	"ergo.services/ergo/gen"
 	"ergo.services/ergo/lib"
-	"ergo.services/probe/unit/stub"
+	"ergo.services/testing/unit/stub"
 	"github.com/stretchr/testify/mock"
 )
 

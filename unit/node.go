@@ -3,7 +3,7 @@ package unit
 import (
 	"ergo.services/ergo/gen"
 	"ergo.services/ergo/lib"
-	"ergo.services/probe/unit/stub"
+	"ergo.services/testing/unit/stub"
 	"sync/atomic"
 	"testing"
 	"time"

@@ -2,7 +2,7 @@ package main
 
 import (
 	"ergo.services/ergo/gen"
-	"ergo.services/probe/unit"
+	"ergo.services/testing/unit"
 	"testing"
 )
 
