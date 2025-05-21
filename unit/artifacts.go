@@ -34,3 +34,7 @@ type ArtifactExitMeta struct {
 	Meta   gen.Alias
 	Reason error
 }
+
+type ArtifactLink struct {
+	Target any
+}
