@@ -48,3 +48,7 @@ type ArtifactMonitor struct {
 type ArtifactDemonitor struct {
 	Target any
 }
+
+type ArtifactLink struct {
+	Target any
+}
