@@ -5,12 +5,16 @@ import (
 
 	"ergo.services/ergo/gen"
 	"ergo.services/testing/unit"
-	"testing"
 )
 
 func TestMyActor_Init(t *testing.T) {
 	options := unit.SpawnOptions{
 		Priority: gen.MessagePriorityNormal,
+		Helpers: unit.SpawnHelpers{
+			Call: []unit.CallHelper{
+				{Request: 12345, Response: 6789},
+			},
+		},
 	}
 	process, err := unit.Spawn(t, factoryMyActor, options)
 	if err != nil {
@@ -40,6 +44,7 @@ func TestMyActor_Init(t *testing.T) {
 	expected = []any{
 		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
 		unit.ArtifactSend{From: process.PID(), To: gen.Atom("abc"), Message: behavior.value},
+		unit.ArtifactCall{From: process.PID(), To: gen.ProcessID{}, Request: 12345},
 	}
 	process.ValidateArtifacts(t, expected)
 

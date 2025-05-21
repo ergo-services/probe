@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -17,13 +16,11 @@ import (
 type Process struct {
 	*stub.Process
 
-	Priority  gen.MessagePriority
-	Important bool
-
+	options   processOptions
 	artifacts lib.QueueMPSC
 }
 
-func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
+func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 	t.Helper()
 
 	if len(expected) == 0 {
@@ -34,21 +31,27 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 	for {
 		a, ok := p.artifacts.Pop()
 		if !ok {
-			break
+			t.Fatalf("ValidateArtifacts: count mismatch: got %d, want %d",
+				len(actual), len(expected))
 		}
-		actual = append(actual, a)
-	}
 
-	if got, want := len(actual), len(expected); got != want {
-		t.Fatalf("ValidateArtifacts: count mismatch: got %d, want %d", got, want)
+		left = int(p.artifacts.Len())
+
+		actual = append(actual, a)
+		if len(actual) < len(expected) {
+			continue
+		}
+
+		break
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
 		// pretty-print to JSON
-		expJSON, _ := json.MarshalIndent(expected, "", "  ")
-		actJSON, _ := json.MarshalIndent(actual, "", "  ")
-		expLines := strings.Split(string(expJSON), "\n")
-		actLines := strings.Split(string(actJSON), "\n")
+		expJSON, _ := marshalWithoutEscaping(expected)
+		actJSON, _ := marshalWithoutEscaping(actual)
+
+		expLines := strings.Split(expJSON, "\n")
+		actLines := strings.Split(actJSON, "\n")
 
 		var b strings.Builder
 		max := len(expLines)
@@ -72,46 +75,92 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) {
 
 		t.Fatalf("ValidateArtifacts: mismatch (-expected +actual):\n%s", b.String())
 	}
+
+	return
 }
 
-func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node) *Process {
+func (p *Process) ResetArtifacts() int {
+	l := p.artifacts.Len()
+	for {
+		_, ok := p.artifacts.Pop()
+		if !ok {
+			break
+		}
+	}
+	return int(l)
+}
+
+type processOptions struct {
+	SpawnOptions
+	node *node
+}
+
+func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *Process {
 	process := &Process{
 		Process:   stub.NewProcess(t),
 		artifacts: artifacts,
+		options:   options,
 	}
-	nodeName := node.Name()
-	creation := node.Creation()
+	nodeName := options.node.Name()
+	creation := options.node.Creation()
 	pid := gen.PID{Node: nodeName, ID: 1000, Creation: creation}
 
-	process.On("Node").Return(node).Maybe()
+	emptyPID := gen.PID{}
+	if options.Parent == emptyPID {
+		options.Parent = options.node.PID()
+	}
+	process.On("Parent").Return(options.Parent).Maybe()
+
+	if options.Leader == emptyPID {
+		options.Leader = options.node.PID()
+	}
+	process.On("Leader").Return(options.Leader).Maybe()
+
+	process.On("Node").Return(options.node).Maybe()
 
 	stubProcessLog := newStubLog(t, artifacts)
-	stubProcessLog.SetLevel(node.Log().Level())
+	stubProcessLog.SetLevel(options.node.Log().Level())
+
 	process.On("Log").Return(stubProcessLog).Maybe()
 	process.On("PID").Return(pid)
-	process.On("Name").Return(name).Maybe()
+
+	process.On("Name").Return(func() gen.Atom {
+		return process.options.Register
+	}).Maybe()
+	process.On("RegisterName", mock.AnythingOfType("gen.Atom")).
+		Return(func(name gen.Atom) error {
+			process.options.Register = name
+			return nil
+		}).Maybe()
+	process.On("UnregisterName", mock.AnythingOfType("gen.Atom")).
+		Return(func(name gen.Atom) error {
+			process.options.Register = ""
+			return nil
+		}).Maybe()
+
+	process.On("Uptime").Return(0).Maybe()
 
 	process.On("SetSendPriority", mock.AnythingOfType("gen.MessagePriority")).
 		Run(func(args mock.Arguments) {
-			process.Priority = args.Get(0).(gen.MessagePriority)
+			process.options.Priority = args.Get(0).(gen.MessagePriority)
 		}).
 		Return(nil).
 		Maybe()
 	process.On("SendPriority").
 		Return(func() gen.MessagePriority {
-			return process.Priority
+			return process.options.Priority
 		}).
 		Maybe()
 
 	process.On("SetImportantDelivery", mock.AnythingOfType("bool")).
 		Run(func(args mock.Arguments) {
-			process.Important = args.Get(0).(bool)
+			process.options.ImportantDelivery = args.Get(0).(bool)
 		}).
 		Return(nil).
 		Maybe()
 	process.On("ImportantDelivery").
 		Return(func() bool {
-			return process.Important
+			return process.options.ImportantDelivery
 		}).
 		Maybe()
 
@@ -121,8 +170,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
-			Priority:  process.Priority,
-			Important: process.Important,
+			Priority:  process.options.Priority,
+			Important: process.options.ImportantDelivery,
 		}
 		process.artifacts.Push(art)
 	}
@@ -134,7 +183,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 			To:        args.Get(0),
 			Message:   args.Get(1),
 			Priority:  args.Get(2).(gen.MessagePriority),
-			Important: process.Important,
+			Important: process.options.ImportantDelivery,
 		}
 		process.artifacts.Push(art)
 	}
@@ -145,7 +194,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 			From:      pid,
 			To:        args.Get(0),
 			Message:   args.Get(1),
-			Priority:  process.Priority,
+			Priority:  process.options.Priority,
 			Important: true,
 		}
 		process.artifacts.Push(art)
@@ -183,9 +232,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 		Run(func(args mock.Arguments) {
 			art := ArtifactEvent{
 				Name:     args.Get(0).(gen.Atom),
-				Token:    args.Get(1).(gen.Ref),
 				Message:  args.Get(2),
-				Priority: process.Priority,
+				Priority: process.options.Priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -221,7 +269,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 				To:       args.Get(0),
 				Ref:      args.Get(1).(gen.Ref),
 				Message:  args.Get(2),
-				Priority: process.Priority,
+				Priority: process.options.Priority,
 			}
 			process.artifacts.Push(art)
 		}).
@@ -235,12 +283,169 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 				To:       args.Get(0),
 				Ref:      args.Get(1).(gen.Ref),
 				Message:  args.Get(2).(error),
-				Priority: process.Priority,
+				Priority: process.options.Priority,
 			}
 			process.artifacts.Push(art)
 		}).
 		Return(nil).
 		Maybe()
+
+	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).Return(func(to any, request any) (any, error) {
+		art := ArtifactCall{
+			From:    pid,
+			To:      to,
+			Request: request,
+		}
+		process.artifacts.Push(art)
+		for _, helper := range process.options.Helpers.Call {
+			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+				continue
+			}
+			return helper.Response, nil
+		}
+
+		return nil, nil
+	}).Maybe()
+
+	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Return(func(to any, request any) (any, error) {
+		art := ArtifactCall{
+			From:    pid,
+			To:      to,
+			Request: request,
+		}
+		process.artifacts.Push(art)
+		for _, helper := range process.options.Helpers.Call {
+			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+				continue
+			}
+			return helper.Response, nil
+		}
+
+		return nil, nil
+	}).Maybe()
+
+	closureCallTimeout := func(to any, request any, _ int) (any, error) {
+		art := ArtifactCall{
+			From:    pid,
+			To:      to,
+			Request: request,
+		}
+		process.artifacts.Push(art)
+		for _, helper := range process.options.Helpers.Call {
+			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+				continue
+			}
+			return helper.Response, nil
+		}
+
+		return nil, nil
+	}
+	closureCall := func(to any, request any) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+	closureCallPID := func(to gen.PID, request any, timeout int) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+	closureCallProcessID := func(to gen.ProcessID, request any, timeout int) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+	closureCallAlias := func(to gen.Alias, request any, timeout int) (any, error) {
+		return closureCallTimeout(to, request, 1)
+	}
+
+	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.Alias"), mock.Anything).Return(closureCall).Maybe()
+	process.
+		On("CallPID", mock.AnythingOfType("gen.PID"), mock.Anything, mock.AnythingOfType("int")).
+		Return(closureCallPID).Maybe()
+	process.
+		On("CallProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything, mock.AnythingOfType("int")).
+		Return(closureCallProcessID).Maybe()
+	process.
+		On("CallAlias", mock.AnythingOfType("gen.Alias"), mock.Anything, mock.AnythingOfType("int")).
+		Return(closureCallAlias).Maybe()
+
+	// monitor
+
+	closureMonitor := func(target any) error {
+		art := ArtifactMonitor{
+			Target: target,
+		}
+		process.artifacts.Push(art)
+		return nil
+	}
+
+	process.On("Monitor", mock.AnythingOfType("gen.PID")).Return(closureMonitor).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.ProcessID")).Return(closureMonitor).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.Alias")).Return(closureMonitor).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.Event")).Return(closureMonitor).Maybe()
+
+	process.On("MonitorNode", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureMonitor).Maybe()
+
+	closureMonitorPID := func(target gen.PID) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorPID", mock.AnythingOfType("gen.PID")).
+		Return(closureMonitorPID).Maybe()
+
+	closureMonitorProcessID := func(target gen.ProcessID) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorProcessID", mock.AnythingOfType("gen.ProcessID")).
+		Return(closureMonitorProcessID).Maybe()
+
+	closureMonitorAlias := func(target gen.Alias) error {
+		return closureMonitor(target)
+	}
+	process.On("MonitorAlias", mock.AnythingOfType("gen.Alias")).
+		Return(closureMonitorAlias).Maybe()
+
+	closureMonitorEvent := func(target gen.Event) ([]gen.MessageEvent, error) {
+		return nil, closureMonitor(target)
+	}
+	process.On("MonitorEvent", mock.AnythingOfType("gen.Event")).
+		Return(closureMonitorEvent).Maybe()
+
+	// demonitor
+
+	closureDemonitor := func(target any) error {
+		art := ArtifactDemonitor{
+			Target: target,
+		}
+		process.artifacts.Push(art)
+		return nil
+	}
+	process.On("Demonitor", mock.AnythingOfType("gen.PID")).Return(closureDemonitor).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.ProcessID")).Return(closureDemonitor).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.Alias")).Return(closureDemonitor).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.Event")).Return(closureDemonitor).Maybe()
+	process.On("DemonitorNode", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureDemonitor).Maybe()
+
+	closureDemonitorPID := func(target gen.PID) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorPID", mock.AnythingOfType("gen.PID")).
+		Return(closureDemonitorPID).Maybe()
+
+	closureDemonitorProcessID := func(target gen.ProcessID) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorProcessID", mock.AnythingOfType("gen.ProcessID")).
+		Return(closureDemonitorProcessID).Maybe()
+
+	closureDemonitorAlias := func(target gen.Alias) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorAlias", mock.AnythingOfType("gen.Alias")).
+		Return(closureDemonitorAlias).Maybe()
+
+	closureDemonitorEvent := func(target gen.Event) error {
+		return closureDemonitor(target)
+	}
+	process.On("DemonitorEvent", mock.AnythingOfType("gen.Event")).
+		Return(closureDemonitorEvent).Maybe()
 
 	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
 
@@ -284,3 +489,24 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, name gen.Atom, node *node
 
 	return process
 }
+
+// TODO:
+// Forward(to PID, message *MailboxMessage, priority MessagePriority) error
+// MetaInfo(meta Alias) (MetaInfo, error)
+// Info() (ProcessInfo, error)
+// RegisterEvent(name Atom, options EventOptions) (Ref, error)
+// UnregisterEvent(name Atom) error
+// Inspect(target PID, item ...string) (map[string]string, error)
+// InspectMeta(meta Alias, item ...string) (map[string]string, error)
+// Events() []Atom
+// Aliases() []Alias
+// DeleteAlias(alias Alias) error
+// CreateAlias() (Alias, error)
+// Env(name Env) (any, bool)
+// SetEnv(name Env, value any)
+// EnvList() map[Env]any
+// RemoteSpawnRegister(node Atom, name Atom, register Atom, options ProcessOptions, args ...any) (PID, error)
+// RemoteSpawn(node Atom, name Atom, options ProcessOptions, args ...any) (PID, error)
+// SpawnMeta(behavior MetaBehavior, options MetaOptions) (Alias, error)
+// SpawnRegister(register Atom, factory ProcessFactory, options ProcessOptions, args ...any) (PID, error)
+// Spawn(factory ProcessFactory, options ProcessOptions, args ...any) (PID, error)

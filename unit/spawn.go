@@ -8,27 +8,45 @@ import (
 )
 
 type SpawnOptions struct {
+	Register          gen.Atom
+	Parent            gen.PID
+	Leader            gen.PID
 	LogLevel          gen.LogLevel
 	Priority          gen.MessagePriority
 	ImportantDelivery bool
+
+	Env map[gen.Env]any
+
+	Helpers SpawnHelpers
+}
+
+type SpawnHelpers struct {
+	Call []CallHelper
+}
+
+type CallHelper struct {
+	Request  any
+	Response any
 }
 
 func Spawn(t testing.TB, factory gen.ProcessFactory, options SpawnOptions, args ...any) (*Process, error) {
-	return SpawnRegister(t, "", factory, options, args...)
-}
-
-func SpawnRegister(t testing.TB, name gen.Atom, factory gen.ProcessFactory, options SpawnOptions, args ...any) (*Process, error) {
-
 	behavior := factory()
 	artifacts := lib.NewQueueMPSC()
 	stubNode := newNode(t, artifacts)
 
 	stubNode.Log().SetLevel(options.LogLevel)
 
-	stubProcess := newProcess(t, artifacts, name, stubNode)
-	_ = stubProcess.SetSendPriority(options.Priority)
-	_ = stubProcess.SetImportantDelivery(options.ImportantDelivery)
+	popts := processOptions{
+		node:         stubNode,
+		SpawnOptions: options,
+	}
+
+	stubProcess := newProcess(t, artifacts, popts)
 	stubProcess.On("Behavior").Return(behavior).Maybe()
-	err := behavior.ProcessInit(stubProcess, args...)
-	return stubProcess, err
+
+	if err := behavior.ProcessInit(stubProcess, args...); err != nil {
+		return nil, err
+	}
+
+	return stubProcess, nil
 }

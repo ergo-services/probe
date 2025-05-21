@@ -28,6 +28,8 @@ func (a *myActor) HandleMessage(from gen.PID, message any) error {
 		a.value += 8
 		a.Log().Info("increased value by %d", 8)
 		a.Send(gen.Atom("abc"), a.value)
+
+		_, _ = a.CallPID(gen.PID{}, 12345, 1)
 		return nil
 	}
 	return gen.TerminateReasonNormal

@@ -20,7 +20,6 @@ type ArtifactLog struct {
 
 type ArtifactEvent struct {
 	Name     gen.Atom
-	Token    gen.Ref
 	Message  any
 	Priority gen.MessagePriority
 }
@@ -33,6 +32,21 @@ type ArtifactExit struct {
 type ArtifactExitMeta struct {
 	Meta   gen.Alias
 	Reason error
+}
+
+type ArtifactCall struct {
+	From     gen.PID
+	To       any
+	Request  any
+	Priority gen.MessagePriority
+}
+
+type ArtifactMonitor struct {
+	Target any
+}
+
+type ArtifactDemonitor struct {
+	Target any
 }
 
 type ArtifactLink struct {
