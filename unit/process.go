@@ -450,6 +450,45 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		Return(closureDemonitorEvent).Maybe()
 
 	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
+
+	// Link
+
+	// 1) the generic two-arg closure
+	closureLink := func(args mock.Arguments) {
+		art := ArtifactLink{
+			Target: args.Get(0),
+		}
+		process.artifacts.Push(art)
+	}
+
+	process.On("Link", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("Link", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("Link", mock.AnythingOfType("gen.Atom"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("Link", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+
+	process.On("Unlink", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("Unlink", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("Unlink", mock.AnythingOfType("gen.Atom"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("Unlink", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+
+	process.On("LinkEvent", mock.AnythingOfType("gen.Event")).
+		Run(closureLink).Return([]gen.MessageEvent{}, nil).Maybe()
+	process.On("UnlinkEvent", mock.AnythingOfType("gen.Event")).
+		Run(closureLink).Return(nil).Maybe()
+
+	process.On("LinkNode", mock.AnythingOfType("gen.Event")).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("UnlinkNode", mock.AnythingOfType("gen.Event")).
+		Run(closureLink).Return(nil).Maybe()
+
 	return process
 }
 
