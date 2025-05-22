@@ -63,7 +63,10 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 				return
 			}
 			format := args.Get(0).(string)
-			params := args.Get(1).([]any)
+			params := []any{}
+			if len(args) == 2 {
+				params = args.Get(1).([]any)
+			}
 			art := ArtifactLog{
 				Level:   gen.LogLevelDebug,
 				Message: fmt.Sprintf(format, params...),
