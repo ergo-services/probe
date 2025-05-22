@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"ergo.services/testing/unit/stub"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Process struct {
@@ -46,12 +48,12 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
-		// pretty-print to JSON
-		expJSON, _ := marshalWithoutEscaping(expected)
-		actJSON, _ := marshalWithoutEscaping(actual)
+		// pretty-print
+		expectedPP := spew.Sdump(expected)
+		actualPP := spew.Sdump(actual)
 
-		expLines := strings.Split(expJSON, "\n")
-		actLines := strings.Split(actJSON, "\n")
+		expLines := strings.Split(expectedPP, "\n")
+		actLines := strings.Split(actualPP, "\n")
 
 		var b strings.Builder
 		max := len(expLines)
