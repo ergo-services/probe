@@ -47,7 +47,10 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 				return
 			}
 			format := args.Get(0).(string)
-			params := args.Get(1).([]any)
+			params := []any{}
+			if len(args) == 2 {
+				params = args.Get(1).([]any)
+			}
 			art := ArtifactLog{
 				Level:   gen.LogLevelInfo,
 				Message: fmt.Sprintf(format, params...),
@@ -59,7 +62,7 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Debug", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level > gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelDebug {
 				return
 			}
 			format := args.Get(0).(string)
@@ -78,11 +81,14 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Warning", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level > gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelWarning {
 				return
 			}
 			format := args.Get(0).(string)
-			params := args.Get(1).([]any)
+			params := []any{}
+			if len(args) == 2 {
+				params = args.Get(1).([]any)
+			}
 			art := ArtifactLog{
 				Level:   gen.LogLevelWarning,
 				Message: fmt.Sprintf(format, params...),
@@ -94,11 +100,14 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 	stubLog.
 		On("Error", mock.IsType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
-			if stubLog.level > gen.LogLevelInfo {
+			if stubLog.level > gen.LogLevelError {
 				return
 			}
 			format := args.Get(0).(string)
-			params := args.Get(1).([]any)
+			params := []any{}
+			if len(args) == 2 {
+				params = args.Get(1).([]any)
+			}
 			art := ArtifactLog{
 				Level:   gen.LogLevelError,
 				Message: fmt.Sprintf(format, params...),
@@ -114,7 +123,10 @@ func newStubLog(t testing.TB, artifacts lib.QueueMPSC) *log {
 				return
 			}
 			format := args.Get(0).(string)
-			params := args.Get(1).([]any)
+			params := []any{}
+			if len(args) == 2 {
+				params = args.Get(1).([]any)
+			}
 			art := ArtifactLog{
 				Level:   gen.LogLevelPanic,
 				Message: fmt.Sprintf(format, params...),
