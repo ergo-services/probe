@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"ergo.services/ergo/gen"
 	"ergo.services/ergo/lib"
@@ -201,6 +202,17 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		}
 		process.artifacts.Push(art)
 	}
+	closureSendAfter := func(args mock.Arguments) {
+		art := ArtifactSend{
+			From:      pid,
+			To:        args.Get(0),
+			Message:   args.Get(1),
+			Priority:  process.options.Priority,
+			Important: process.options.ImportantDelivery,
+			After:     args.Get(2).(time.Duration),
+		}
+		process.artifacts.Push(art)
+	}
 
 	process.On("Send", mock.AnythingOfType("gen.PID"), mock.Anything).
 		Run(closureSend).Return(nil).Maybe()
@@ -226,7 +238,7 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 	// SendAfter
 	// Todo do we want to check gen.CancelFunc?
 	process.On("SendAfter", mock.Anything, mock.Anything, mock.AnythingOfType("time.Duration")).
-		Run(closureSend).
+		Run(closureSendAfter).
 		Return(gen.CancelFunc(nil), nil).
 		Maybe()
 

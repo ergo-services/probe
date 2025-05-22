@@ -2,6 +2,7 @@ package unit
 
 import (
 	"ergo.services/ergo/gen"
+	"time"
 )
 
 type ArtifactSend struct {
@@ -11,6 +12,7 @@ type ArtifactSend struct {
 	Priority  gen.MessagePriority // SendWithPriority
 	Important bool                // SendImportant
 	Ref       gen.Ref             // SendResponse
+	After     time.Duration       // SendAfter
 }
 
 type ArtifactLog struct {
