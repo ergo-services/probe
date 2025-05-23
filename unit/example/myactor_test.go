@@ -50,6 +50,7 @@ func TestMyActor_Init(t *testing.T) {
 		// unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
 		unit.ArtifactSend{From: process.PID(), To: gen.Atom("abc"), Message: behavior.value},
 		unit.ArtifactCall{From: process.PID(), To: gen.PID{}, Request: 12345},
+		unit.ArtifactSend{From: process.PID(), To: gen.Atom("def"), Message: 6789},
 	}
 	artifactsLeft = process.ValidateArtifacts(t, expected)
 	require.Equal(t, artifactsLeft, 0)
