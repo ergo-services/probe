@@ -1,0 +1,12 @@
+# mockery v3 is required 
+
+all: false
+structname: '{{.InterfaceName}}'
+dir: ./stub
+pkgname: stub
+template: testify
+packages:
+  ergo.services/ergo/gen:
+    config:
+      all: true
+      filename: "{{.InterfaceName | snakecase}}.go"
