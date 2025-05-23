@@ -34,6 +34,9 @@ func Spawn(t testing.TB, factory gen.ProcessFactory, options SpawnOptions, args 
 	artifacts := lib.NewQueueMPSC()
 	stubNode := newNode(t, artifacts)
 
+	if options.LogLevel == gen.LogLevelDefault {
+		options.LogLevel = gen.LogLevelTrace
+	}
 	stubNode.Log().SetLevel(options.LogLevel)
 
 	popts := processOptions{

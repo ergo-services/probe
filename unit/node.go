@@ -25,7 +25,7 @@ func newNode(t testing.TB, artifacts lib.QueueMPSC) *node {
 
 	virtualPID := gen.PID{Node: nodeName, ID: 1, Creation: creation}
 	stubNodeLog := newStubLog(t, artifacts)
-	stubNodeLog.SetLevel(gen.LogLevelTrace)
+	stubNodeLog.SetLevel(gen.LogLevelDebug)
 	stubNode.On("Log").Return(stubNodeLog).Maybe()
 	stubNode.On("Name").Return(nodeName).Maybe()
 	stubNode.On("Creation").Return(creation).Maybe()

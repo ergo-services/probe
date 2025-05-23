@@ -25,6 +25,8 @@ func TestMyActor_Init(t *testing.T) {
 	expected := []any{
 		unit.ArtifactSend{From: process.PID(), To: process.PID(), Message: "hello"},
 		unit.ArtifactLog{Level: gen.LogLevelDebug, Message: "actor started " + process.PID().String() + " 1"},
+		unit.ArtifactSpawn{Factory: factoryMyActor, Args: []any{1}},
+		unit.ArtifactSpawn{Factory: factoryMyActor},
 	}
 	process.ValidateArtifacts(t, expected)
 

@@ -15,6 +15,12 @@ type ArtifactSend struct {
 	After     time.Duration       // SendAfter
 }
 
+type ArtifactSpawn struct {
+	Factory gen.ProcessFactory
+	Options gen.ProcessOptions
+	Args    []any
+}
+
 type ArtifactLog struct {
 	Level   gen.LogLevel
 	Message string

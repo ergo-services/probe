@@ -21,6 +21,7 @@ type Process struct {
 
 	options   processOptions
 	artifacts lib.QueueMPSC
+	uniq      uint64
 }
 
 func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
@@ -30,10 +31,12 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 		t.Fatal("ValidateArtifacts: no artifacts specified")
 	}
 
-	var actual []any
+	// slice must have the same capacity
+	actual := make([]any, 0, p.artifacts.Len())
 	for {
 		a, ok := p.artifacts.Pop()
 		if !ok {
+			// t.Error(spew.Sdump(actual))
 			t.Fatalf("ValidateArtifacts: count mismatch: got %d, want %d",
 				len(actual), len(expected))
 		}
@@ -61,6 +64,8 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 		if len(actLines) > max {
 			max = len(actLines)
 		}
+
+		stringEqual := true
 		for i := 0; i < max; i++ {
 			e, a := "", ""
 			if i < len(expLines) {
@@ -72,11 +77,15 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 			if e == a {
 				b.WriteString("  " + e + "\n")
 			} else {
+				stringEqual = false
 				b.WriteString(fmt.Sprintf("- %s\n+ %s\n", e, a))
 			}
 		}
 
-		t.Fatalf("ValidateArtifacts: mismatch (-expected +actual):\n%s", b.String())
+		// DeepEqual doesnt work for closures (gen.ProcessFactory as an example)
+		if stringEqual == false {
+			t.Fatalf("ValidateArtifacts: mismatch (-expected +actual):\n%s", b.String())
+		}
 	}
 
 	return
@@ -104,8 +113,10 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		artifacts: artifacts,
 		options:   options,
 	}
+
 	nodeName := options.node.Name()
 	creation := options.node.Creation()
+	process.uniq = 1000
 	pid := gen.PID{Node: nodeName, ID: 1000, Creation: creation}
 
 	emptyPID := gen.PID{}
@@ -125,11 +136,40 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 	stubProcessLog.SetLevel(options.node.Log().Level())
 
 	process.On("Log").Return(stubProcessLog).Maybe()
-	process.On("PID").Return(pid)
+	process.On("PID").Return(pid).Maybe()
+
+	process.On("Env", mock.AnythingOfType("gen.Env")).Return(func(name gen.Env) (any, bool) {
+		v, found := process.options.Env[name]
+		return v, found
+	}).Maybe()
+
+	process.
+		On("SetEnv", mock.AnythingOfType("gen.Env"), mock.Anything).
+		Run(func(args mock.Arguments) {
+			if process.options.Env == nil {
+				process.options.Env = make(map[gen.Env]any)
+			}
+			process.options.Env[args.Get(0).(gen.Env)] = args.Get(1)
+		}).Maybe()
+
+	process.
+		On("Spawn", mock.AnythingOfType("gen.ProcessFactory"), mock.AnythingOfType("gen.ProcessOptions"), mock.Anything).
+		Run(func(args mock.Arguments) {
+			art := ArtifactSpawn{
+				Factory: args.Get(0).(gen.ProcessFactory),
+				Options: args.Get(1).(gen.ProcessOptions),
+			}
+			if len(args) == 3 {
+				art.Args = args.Get(2).([]any)
+			}
+			process.uniq++
+			process.artifacts.Push(art)
+		}).Return(gen.PID{Node: nodeName, ID: process.uniq, Creation: creation}, nil).Maybe()
 
 	process.On("Name").Return(func() gen.Atom {
 		return process.options.Register
 	}).Maybe()
+
 	process.On("RegisterName", mock.AnythingOfType("gen.Atom")).
 		Return(func(name gen.Atom) error {
 			process.options.Register = name
@@ -516,11 +556,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 // Aliases() []Alias
 // DeleteAlias(alias Alias) error
 // CreateAlias() (Alias, error)
-// Env(name Env) (any, bool)
-// SetEnv(name Env, value any)
 // EnvList() map[Env]any
 // RemoteSpawnRegister(node Atom, name Atom, register Atom, options ProcessOptions, args ...any) (PID, error)
 // RemoteSpawn(node Atom, name Atom, options ProcessOptions, args ...any) (PID, error)
 // SpawnMeta(behavior MetaBehavior, options MetaOptions) (Alias, error)
 // SpawnRegister(register Atom, factory ProcessFactory, options ProcessOptions, args ...any) (PID, error)
-// Spawn(factory ProcessFactory, options ProcessOptions, args ...any) (PID, error)

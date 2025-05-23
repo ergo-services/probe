@@ -19,6 +19,8 @@ func (a *myActor) Init(args ...any) error {
 	a.value = 1
 	a.Send(a.PID(), "hello")
 	a.Log().Debug("actor started %s %d", a.PID(), a.value)
+	a.Spawn(factoryMyActor, gen.ProcessOptions{}, 1)
+	a.Spawn(factoryMyActor, gen.ProcessOptions{})
 	return nil
 }
 
