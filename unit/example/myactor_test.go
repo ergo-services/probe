@@ -6,6 +6,7 @@ import (
 	"ergo.services/ergo/gen"
 
 	"ergo.services/testing/unit"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMyActor_Init(t *testing.T) {
@@ -28,7 +29,8 @@ func TestMyActor_Init(t *testing.T) {
 		unit.ArtifactSpawn{Factory: factoryMyActor, Args: []any{1}},
 		unit.ArtifactSpawn{Factory: factoryMyActor},
 	}
-	process.ValidateArtifacts(t, expected)
+	artifactsLeft := process.ValidateArtifacts(t, expected)
+	require.Equal(t, artifactsLeft, 0)
 
 	behavior := process.Behavior().(*myActor)
 	if behavior.value != 1 {
@@ -49,6 +51,7 @@ func TestMyActor_Init(t *testing.T) {
 		unit.ArtifactSend{From: process.PID(), To: gen.Atom("abc"), Message: behavior.value},
 		unit.ArtifactCall{From: process.PID(), To: gen.PID{}, Request: 12345},
 	}
-	process.ValidateArtifacts(t, expected)
+	artifactsLeft = process.ValidateArtifacts(t, expected)
+	require.Equal(t, artifactsLeft, 0)
 
 }
