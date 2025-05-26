@@ -206,6 +206,8 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			return process.options.ImportantDelivery
 		}).
 		Maybe()
+	process.On("State").
+		Return(gen.ProcessStateRunning).Maybe()
 
 	// 1) the generic two-arg Send(dest, msg)
 	closureSend := func(args mock.Arguments) {
