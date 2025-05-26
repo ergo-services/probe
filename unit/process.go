@@ -9,11 +9,9 @@ import (
 
 	"ergo.services/ergo/gen"
 	"ergo.services/ergo/lib"
-	"github.com/stretchr/testify/mock"
-
 	"ergo.services/testing/unit/stub"
-
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/mock"
 )
 
 type Process struct {
@@ -153,7 +151,12 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		}).Maybe()
 
 	process.
-		On("Spawn", mock.AnythingOfType("gen.ProcessFactory"), mock.AnythingOfType("gen.ProcessOptions"), mock.Anything).
+		On(
+			"Spawn",
+			mock.AnythingOfType("gen.ProcessFactory"),
+			mock.AnythingOfType("gen.ProcessOptions"),
+			mock.Anything,
+		).
 		Run(func(args mock.Arguments) {
 			art := ArtifactSpawn{
 				Factory: args.Get(0).(gen.ProcessFactory),
@@ -206,8 +209,12 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			return process.options.ImportantDelivery
 		}).
 		Maybe()
+
 	process.On("State").
 		Return(gen.ProcessStateRunning).Maybe()
+
+	process.On("Mailbox").
+		Return(gen.ProcessMailbox{}).Maybe()
 
 	// 1) the generic two-arg Send(dest, msg)
 	closureSend := func(args mock.Arguments) {
@@ -346,39 +353,43 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		Return(nil).
 		Maybe()
 
-	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).Return(func(to any, request any) (any, error) {
-		art := ArtifactCall{
-			From:    pid,
-			To:      to,
-			Request: request,
-		}
-		process.artifacts.Push(art)
-		for _, helper := range process.options.Helpers.Call {
-			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
-				continue
+	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Return(func(to any, request any) (any, error) {
+			art := ArtifactCall{
+				From:    pid,
+				To:      to,
+				Request: request,
 			}
-			return helper.Response, nil
-		}
-
-		return nil, nil
-	}).Maybe()
-
-	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Return(func(to any, request any) (any, error) {
-		art := ArtifactCall{
-			From:    pid,
-			To:      to,
-			Request: request,
-		}
-		process.artifacts.Push(art)
-		for _, helper := range process.options.Helpers.Call {
-			if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
-				continue
+			process.artifacts.Push(art)
+			for _, helper := range process.options.Helpers.Call {
+				if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+					continue
+				}
+				return helper.Response, nil
 			}
-			return helper.Response, nil
-		}
 
-		return nil, nil
-	}).Maybe()
+			return nil, nil
+		}).
+		Maybe()
+
+	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Return(func(to any, request any) (any, error) {
+			art := ArtifactCall{
+				From:    pid,
+				To:      to,
+				Request: request,
+			}
+			process.artifacts.Push(art)
+			for _, helper := range process.options.Helpers.Call {
+				if eq := reflect.DeepEqual(art.Request, helper.Request); eq == false {
+					continue
+				}
+				return helper.Response, nil
+			}
+
+			return nil, nil
+		}).
+		Maybe()
 
 	closureCallTimeout := func(to any, request any, _ int) (any, error) {
 		art := ArtifactCall{
@@ -411,104 +422,94 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 
 	process.On("Call", mock.AnythingOfType("gen.PID"), mock.Anything).Return(closureCall).Maybe()
 	process.On("Call", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureCall).Maybe()
-	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).Return(closureCall).Maybe()
+	process.On("Call", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Return(closureCall).
+		Maybe()
 	process.On("Call", mock.AnythingOfType("gen.Alias"), mock.Anything).Return(closureCall).Maybe()
 	process.
 		On("CallPID", mock.AnythingOfType("gen.PID"), mock.Anything, mock.AnythingOfType("int")).
 		Return(closureCallPID).Maybe()
 	process.
-		On("CallProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything, mock.AnythingOfType("int")).
+		On(
+			"CallProcessID",
+			mock.AnythingOfType("gen.ProcessID"),
+			mock.Anything,
+			mock.AnythingOfType("int"),
+		).
 		Return(closureCallProcessID).Maybe()
 	process.
-		On("CallAlias", mock.AnythingOfType("gen.Alias"), mock.Anything, mock.AnythingOfType("int")).
+		On(
+			"CallAlias",
+			mock.AnythingOfType("gen.Alias"),
+			mock.Anything,
+			mock.AnythingOfType("int"),
+		).
 		Return(closureCallAlias).Maybe()
 
 	// monitor
 
-	closureMonitor := func(target any) error {
+	closureMonitor := func(args mock.Arguments) {
 		art := ArtifactMonitor{
-			Target: target,
+			Target: args.Get(0),
 		}
 		process.artifacts.Push(art)
-		return nil
 	}
-
-	process.On("Monitor", mock.AnythingOfType("gen.PID")).Return(closureMonitor).Maybe()
-	process.On("Monitor", mock.AnythingOfType("gen.ProcessID")).Return(closureMonitor).Maybe()
-	process.On("Monitor", mock.AnythingOfType("gen.Alias")).Return(closureMonitor).Maybe()
-	process.On("Monitor", mock.AnythingOfType("gen.Event")).Return(closureMonitor).Maybe()
-
-	process.On("MonitorNode", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureMonitor).Maybe()
-
-	closureMonitorPID := func(target gen.PID) error {
-		return closureMonitor(target)
-	}
-	process.On("MonitorPID", mock.AnythingOfType("gen.PID")).
-		Return(closureMonitorPID).Maybe()
-
-	closureMonitorProcessID := func(target gen.ProcessID) error {
-		return closureMonitor(target)
-	}
-	process.On("MonitorProcessID", mock.AnythingOfType("gen.ProcessID")).
-		Return(closureMonitorProcessID).Maybe()
-
-	closureMonitorAlias := func(target gen.Alias) error {
-		return closureMonitor(target)
-	}
-	process.On("MonitorAlias", mock.AnythingOfType("gen.Alias")).
-		Return(closureMonitorAlias).Maybe()
-
-	closureMonitorEvent := func(target gen.Event) ([]gen.MessageEvent, error) {
-		return nil, closureMonitor(target)
-	}
-	process.On("MonitorEvent", mock.AnythingOfType("gen.Event")).
-		Return(closureMonitorEvent).Maybe()
-
-	// demonitor
-
-	closureDemonitor := func(target any) error {
+	closureDemonitor := func(args mock.Arguments) {
 		art := ArtifactDemonitor{
-			Target: target,
+			Target: args.Get(0),
 		}
 		process.artifacts.Push(art)
-		return nil
 	}
-	process.On("Demonitor", mock.AnythingOfType("gen.PID")).Return(closureDemonitor).Maybe()
-	process.On("Demonitor", mock.AnythingOfType("gen.ProcessID")).Return(closureDemonitor).Maybe()
-	process.On("Demonitor", mock.AnythingOfType("gen.Alias")).Return(closureDemonitor).Maybe()
-	process.On("Demonitor", mock.AnythingOfType("gen.Event")).Return(closureDemonitor).Maybe()
-	process.On("DemonitorNode", mock.AnythingOfType("gen.Atom"), mock.Anything).Return(closureDemonitor).Maybe()
 
-	closureDemonitorPID := func(target gen.PID) error {
-		return closureDemonitor(target)
-	}
-	process.On("DemonitorPID", mock.AnythingOfType("gen.PID")).
-		Return(closureDemonitorPID).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.Atom"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
+	process.On("Monitor", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
 
-	closureDemonitorProcessID := func(target gen.ProcessID) error {
-		return closureDemonitor(target)
-	}
-	process.On("DemonitorProcessID", mock.AnythingOfType("gen.ProcessID")).
-		Return(closureDemonitorProcessID).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.Atom"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
+	process.On("Demonitor", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
 
-	closureDemonitorAlias := func(target gen.Alias) error {
-		return closureDemonitor(target)
-	}
-	process.On("DemonitorAlias", mock.AnythingOfType("gen.Alias")).
-		Return(closureDemonitorAlias).Maybe()
+	process.On("MonitorPID", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
+	process.On("MonitorProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
+	process.On("MonitorAlias", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureMonitor).Return(nil).Maybe()
+	process.On("MonitorEvent", mock.AnythingOfType("gen.Event")).
+		Run(closureMonitor).Return([]gen.MessageEvent{}, nil).Maybe()
+	process.On("MonitorNode", mock.AnythingOfType("gen.Atom")).
+		Run(closureMonitor).Return(nil).Maybe()
 
-	closureDemonitorEvent := func(target gen.Event) error {
-		return closureDemonitor(target)
-	}
+	process.On("DemonitorPID", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
+	process.On("DemonitorProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
+	process.On("DemonitorAlias", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureDemonitor).Return(nil).Maybe()
 	process.On("DemonitorEvent", mock.AnythingOfType("gen.Event")).
-		Return(closureDemonitorEvent).Maybe()
-
-	process.On("Mailbox").Return(gen.ProcessMailbox{}).Maybe()
+		Run(closureDemonitor).Return(nil).Maybe()
+	process.On("DemonitorNode", mock.AnythingOfType("gen.Atom")).
+		Run(closureDemonitor).Return(nil).Maybe()
 
 	// Link
 
-	// 1) the generic two-arg closure
 	closureLink := func(args mock.Arguments) {
+		art := ArtifactLink{
+			Target: args.Get(0),
+		}
+		process.artifacts.Push(art)
+	}
+	closureUnlink := func(args mock.Arguments) {
 		art := ArtifactLink{
 			Target: args.Get(0),
 		}
@@ -525,23 +526,35 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 		Run(closureLink).Return(nil).Maybe()
 
 	process.On("Unlink", mock.AnythingOfType("gen.PID"), mock.Anything).
-		Run(closureLink).Return(nil).Maybe()
+		Run(closureUnlink).Return(nil).Maybe()
 	process.On("Unlink", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
-		Run(closureLink).Return(nil).Maybe()
+		Run(closureUnlink).Return(nil).Maybe()
 	process.On("Unlink", mock.AnythingOfType("gen.Atom"), mock.Anything).
-		Run(closureLink).Return(nil).Maybe()
+		Run(closureUnlink).Return(nil).Maybe()
 	process.On("Unlink", mock.AnythingOfType("gen.Alias"), mock.Anything).
-		Run(closureLink).Return(nil).Maybe()
+		Run(closureUnlink).Return(nil).Maybe()
 
+	process.On("LinkPID", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("LinkProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
+	process.On("LinkAlias", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureLink).Return(nil).Maybe()
 	process.On("LinkEvent", mock.AnythingOfType("gen.Event")).
 		Run(closureLink).Return([]gen.MessageEvent{}, nil).Maybe()
-	process.On("UnlinkEvent", mock.AnythingOfType("gen.Event")).
+	process.On("LinkNode", mock.AnythingOfType("gen.Atom")).
 		Run(closureLink).Return(nil).Maybe()
 
-	process.On("LinkNode", mock.AnythingOfType("gen.Event")).
-		Run(closureLink).Return(nil).Maybe()
-	process.On("UnlinkNode", mock.AnythingOfType("gen.Event")).
-		Run(closureLink).Return(nil).Maybe()
+	process.On("UnlinkPID", mock.AnythingOfType("gen.PID"), mock.Anything).
+		Run(closureUnlink).Return(nil).Maybe()
+	process.On("UnlinkProcessID", mock.AnythingOfType("gen.ProcessID"), mock.Anything).
+		Run(closureUnlink).Return(nil).Maybe()
+	process.On("UnlinkAlias", mock.AnythingOfType("gen.Alias"), mock.Anything).
+		Run(closureUnlink).Return(nil).Maybe()
+	process.On("UnlinkEvent", mock.AnythingOfType("gen.Event")).
+		Run(closureUnlink).Return(nil).Maybe()
+	process.On("UnlinkNode", mock.AnythingOfType("gen.Atom")).
+		Run(closureUnlink).Return(nil).Maybe()
 
 	return process
 }

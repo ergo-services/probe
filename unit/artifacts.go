@@ -1,8 +1,9 @@
 package unit
 
 import (
-	"ergo.services/ergo/gen"
 	"time"
+
+	"ergo.services/ergo/gen"
 )
 
 type ArtifactSend struct {
@@ -58,5 +59,9 @@ type ArtifactDemonitor struct {
 }
 
 type ArtifactLink struct {
+	Target any
+}
+
+type ArtifactUnink struct {
 	Target any
 }
