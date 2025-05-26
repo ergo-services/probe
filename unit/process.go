@@ -32,7 +32,7 @@ func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 	}
 
 	// slice must have the same capacity
-	actual := make([]any, 0, p.artifacts.Len())
+	actual := make([]any, 0, len(expected))
 	for {
 		a, ok := p.artifacts.Pop()
 		if !ok {
