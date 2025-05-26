@@ -3,7 +3,7 @@ module ergo.services/testing/unit
 go 1.20
 
 require (
-	ergo.services/ergo v1.999.300
+	ergo.services/ergo v1.999.301-0.20250515070552-dfe8075e63e5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/stretchr/testify v1.10.0
 )
