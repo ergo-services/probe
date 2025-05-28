@@ -35,7 +35,8 @@ func Spawn(t testing.TB, factory gen.ProcessFactory, options SpawnOptions, args 
 	stubNode := newNode(t, artifacts)
 
 	if options.LogLevel == gen.LogLevelDefault {
-		options.LogLevel = gen.LogLevelTrace
+		// Default log level is set to Error if not specified
+		options.LogLevel = gen.LogLevelError
 	}
 	stubNode.Log().SetLevel(options.LogLevel)
 
