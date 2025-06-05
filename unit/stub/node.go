@@ -850,6 +850,54 @@ func (_c *Node_Env_Call) RunAndReturn(run func(name gen.Env) (any, bool)) *Node_
 	return _c
 }
 
+// EnvDefault provides a mock function for the type Node
+func (_mock *Node) EnvDefault(name gen.Env, def any) any {
+	ret := _mock.Called(name, def)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnvDefault")
+	}
+
+	var r0 any
+	if returnFunc, ok := ret.Get(0).(func(gen.Env, any) any); ok {
+		r0 = returnFunc(name, def)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+	return r0
+}
+
+// Node_EnvDefault_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnvDefault'
+type Node_EnvDefault_Call struct {
+	*mock.Call
+}
+
+// EnvDefault is a helper method to define mock.On call
+//   - name
+//   - def
+func (_e *Node_Expecter) EnvDefault(name interface{}, def interface{}) *Node_EnvDefault_Call {
+	return &Node_EnvDefault_Call{Call: _e.mock.On("EnvDefault", name, def)}
+}
+
+func (_c *Node_EnvDefault_Call) Run(run func(name gen.Env, def any)) *Node_EnvDefault_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(gen.Env), args[1].(any))
+	})
+	return _c
+}
+
+func (_c *Node_EnvDefault_Call) Return(v any) *Node_EnvDefault_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Node_EnvDefault_Call) RunAndReturn(run func(name gen.Env, def any) any) *Node_EnvDefault_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnvList provides a mock function for the type Node
 func (_mock *Node) EnvList() map[gen.Env]any {
 	ret := _mock.Called()
