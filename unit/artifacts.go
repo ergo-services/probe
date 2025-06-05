@@ -22,6 +22,11 @@ type ArtifactSpawn struct {
 	Args    []any
 }
 
+type ArtifactSpawnMeta struct {
+	Factory gen.MetaBehavior
+	Options gen.MetaOptions
+}
+
 type ArtifactLog struct {
 	Level   gen.LogLevel
 	Message string

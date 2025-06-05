@@ -169,6 +169,24 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 			process.artifacts.Push(art)
 		}).Return(gen.PID{Node: nodeName, ID: process.uniq, Creation: creation}, nil).Maybe()
 
+	process.
+		On(
+			"SpawnMeta",
+			mock.MatchedBy(func(arg any) bool {
+				_, ok := arg.(gen.MetaBehavior)
+				return ok
+			}),
+			mock.AnythingOfType("gen.MetaOptions"),
+		).
+		Run(func(args mock.Arguments) {
+			art := ArtifactSpawnMeta{
+				Factory: args.Get(0).(gen.MetaBehavior),
+				Options: args.Get(1).(gen.MetaOptions),
+			}
+			process.uniq++
+			process.artifacts.Push(art)
+		}).Return(gen.Alias{Node: nodeName, ID: [3]uint64{process.uniq, 0, 0}, Creation: creation}, nil).Maybe()
+
 	process.On("Name").Return(func() gen.Atom {
 		return process.options.Register
 	}).Maybe()
