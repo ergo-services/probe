@@ -25,16 +25,15 @@ type Process struct {
 func (p *Process) ValidateArtifacts(t testing.TB, expected []any) (left int) {
 	t.Helper()
 
-	if len(expected) == 0 {
-		t.Fatal("ValidateArtifacts: no artifacts specified")
-	}
-
 	// slice must have the same capacity
 	actual := make([]any, 0, len(expected))
 	for {
 		a, ok := p.artifacts.Pop()
 		if !ok {
-			// t.Error(spew.Sdump(actual))
+			if len(expected) == 0 {
+				return 0
+			}
+
 			t.Fatalf("ValidateArtifacts: count mismatch: got %d, want %d",
 				len(actual), len(expected))
 		}
@@ -139,6 +138,14 @@ func newProcess(t testing.TB, artifacts lib.QueueMPSC, options processOptions) *
 	process.On("Env", mock.AnythingOfType("gen.Env")).Return(func(name gen.Env) (any, bool) {
 		v, found := process.options.Env[name]
 		return v, found
+	}).Maybe()
+
+	process.On("EnvDefault", mock.AnythingOfType("gen.Env"), mock.Anything).Return(func(name gen.Env, def any) any {
+		v, found := process.options.Env[name]
+		if found == false {
+			return def
+		}
+		return v
 	}).Maybe()
 
 	process.
